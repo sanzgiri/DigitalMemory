@@ -6,80 +6,69 @@ import pandas as pd
 def get_edge_history():
     """
     Retrieves Microsoft Edge browsing history from the local macOS machine.
-    It iterates through all detected profiles to find the active history.
 
     Returns:
         A pandas DataFrame containing the browsing history.
     """
     user = getpass.getuser()
-    edge_app_support_path = f'/Users/{user}/Library/Application Support/Microsoft Edge'
+    history_db = f'/Users/{user}/Library/Application Support/Microsoft Edge/Default/History'
 
-    if not os.path.exists(edge_app_support_path):
-        print(f"Microsoft Edge application support path not found at: {edge_app_support_path}")
+    print(f"Attempting to access Edge history database at: {history_db}")
+
+    if not os.path.exists(history_db):
+        print(f"Edge history database file does not exist at: {history_db}")
         return pd.DataFrame()
 
-    profile_dirs = [d for d in os.listdir(edge_app_support_path) if os.path.isdir(os.path.join(edge_app_support_path, d))]
+    try:
+        connection = sqlite3.connect(history_db)
+        cursor = connection.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        print(f"Tables found in Edge history database: {tables}")
 
-    for profile_dir in profile_dirs:
-        history_db = os.path.join(edge_app_support_path, profile_dir, 'History')
-        print(f"Attempting to access Edge history database in profile '{profile_dir}' at: {history_db}")
+        if not tables:
+            print(f"Warning: The database file at {history_db} exists but contains no tables. It might be empty or not the correct history file.")
 
-        if not os.path.exists(history_db):
-            print(f"  History file not found in profile '{profile_dir}'. Skipping.")
-            continue
+        # Inspect schema of relevant tables
+        for table_name in ['urls', 'visits', 'edge_urls', 'edge_visits']:
+            if (table_name,) in tables:
+                cursor.execute(f"PRAGMA table_info({table_name});")
+                columns = cursor.fetchall()
+                print(f"  Schema for table '{table_name}': {columns}")
 
-        try:
-            connection = sqlite3.connect(history_db)
-            cursor = connection.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-            tables = cursor.fetchall()
-            print(f"  Tables found in profile '{profile_dir}' database: {tables}")
+        # Get row counts for urls and visits tables
+        if ('urls',) in tables:
+            cursor.execute("SELECT COUNT(*) FROM urls;")
+            urls_count = cursor.fetchone()[0]
+            print(f"  Number of entries in 'urls' table: {urls_count}")
+        if ('visits',) in tables:
+            cursor.execute("SELECT COUNT(*) FROM visits;")
+            visits_count = cursor.fetchone()[0]
+            print(f"  Number of entries in 'visits' table: {visits_count}")
 
-            if not tables:
-                print(f"  Warning: Database in profile '{profile_dir}' exists but contains no tables. Skipping.")
-                connection.close()
-                continue
+        query = """
+        SELECT
+            u.url,
+            u.title,
+            datetime(v.visit_time/1000000-11644473600, 'unixepoch', 'localtime') as last_visit_time
+        FROM urls u
+        JOIN visits v ON u.id = v.url
+        ORDER BY v.visit_time DESC
+        """
+        history_df = pd.read_sql_query(query, connection)
+        print(f"Successfully retrieved history from profile 'Default'.")
+        return history_df
 
-            # Inspect schema of relevant tables
-            for table_name in ['urls', 'visits', 'edge_urls', 'edge_visits']:
-                if (table_name,) in tables:
-                    cursor.execute(f"PRAGMA table_info({table_name});")
-                    columns = cursor.fetchall()
-                    print(f"  Schema for table '{table_name}': {columns}")
+    except sqlite3.OperationalError as e:
+        print(f"Error accessing database in profile 'Default': {e}")
+        print("Please make sure Edge is closed before running this script.")
+    except Exception as e:
+        print(f"An unexpected error occurred with profile 'Default': {e}")
+    finally:
+        if 'connection' in locals() and connection:
+            connection.close()
 
-            # Get row counts for urls and visits tables
-            if ('urls',) in tables:
-                cursor.execute("SELECT COUNT(*) FROM urls;")
-                urls_count = cursor.fetchone()[0]
-                print(f"  Number of entries in 'urls' table: {urls_count}")
-            if ('visits',) in tables:
-                cursor.execute("SELECT COUNT(*) FROM visits;")
-                visits_count = cursor.fetchone()[0]
-                print(f"  Number of entries in 'visits' table: {visits_count}")
-
-            query = """
-            SELECT
-                u.url,
-                u.title,
-                datetime(v.visit_time/1000000-11644473600, 'unixepoch', 'localtime') as last_visit_time
-            FROM urls u
-            JOIN visits v ON u.id = v.url
-            ORDER BY v.visit_time DESC
-            """
-            history_df = pd.read_sql_query(query, connection)
-            print(f"Successfully retrieved history from profile '{profile_dir}'.")
-            return history_df
-
-        except sqlite3.OperationalError as e:
-            print(f"  Error accessing database in profile '{profile_dir}': {e}")
-            print("  Please make sure Edge is closed before running this script.")
-        except Exception as e:
-            print(f"  An unexpected error occurred with profile '{profile_dir}': {e}")
-        finally:
-            if 'connection' in locals() and connection:
-                connection.close()
-
-    print("No valid Edge history database found across all profiles.")
+    print("No valid Edge history database found in Default profile.")
     return pd.DataFrame()
 
 def get_recently_closed_edge_tabs():
