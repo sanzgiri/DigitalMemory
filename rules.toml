@@ -1,0 +1,67 @@
+# Refinable rules for DigitalMemory
+# You can edit these patterns without touching code.
+# Patterns are regular expressions, matched against the domain (netloc) only.
+
+[exclude]
+email = [
+  "mail\.google\.com",
+  "outlook\.live\.com",
+  "mail\.yahoo\.com",
+  "icloud\.com/mail",
+]
+
+social = [
+  "facebook\.com",
+  "instagram\.com",
+  "twitter\.com|x\.com",
+  "linkedin\.com",
+  "tiktok\.com",
+]
+
+finance = [
+  "chase\.com",
+  "bankofamerica\.com",
+  "wellsfargo\.com",
+  "schwab\.com",
+  "robinhood\.com",
+  "fidelity\.com",
+]
+
+news = [
+  "nytimes\.com",
+  "cnn\.com",
+  "bbc\.co\.uk|bbc\.com",
+  "foxnews\.com",
+  "washingtonpost\.com",
+  "wsj\.com",
+  "reuters\.com",
+]
+
+streaming = [
+  "netflix\.com",
+  "youtube\.com",
+  "spotify\.com",
+  "hulu\.com",
+  "disneyplus\.com",
+]
+
+shopping = [
+  "amazon\.com",
+  "ebay\.com",
+  "etsy\.com",
+]
+
+# Keywords searched in titles to identify informational content.
+# This complements the LLM classification.
+informational_keywords = [
+  "docs",
+  "wiki",
+  "guide",
+  "how to",
+  "research",
+  "paper",
+  "api",
+  "reference",
+  "tutorial",
+  "documentation",
+]
